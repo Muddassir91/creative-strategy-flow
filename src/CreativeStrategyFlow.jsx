@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 /* ─── Minimal inline SVG icons ─── */
 const icons = {
@@ -98,10 +98,77 @@ const icons = {
   chevronDown: (
     <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
   ),
-  chevronUp: (
-    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+  arrowRight: (
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+  ),
+  check: (
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
   ),
 };
+
+/* ─── Scroll-triggered fade-in hook ─── */
+function useInView(threshold = 0.15) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return [ref, visible];
+}
+
+/* ─── Animated counter ─── */
+function AnimatedNumber({ value, suffix = "" }) {
+  const [display, setDisplay] = useState(0);
+  const ref = useRef(null);
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setStarted(true); obs.disconnect(); } }, { threshold: 0.5 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!started) return;
+    let frame;
+    const duration = 1200;
+    const start = performance.now();
+    const animate = (now) => {
+      const t = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(Math.round(eased * value));
+      if (t < 1) frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [started, value]);
+  return <span ref={ref}>{display}{suffix}</span>;
+}
+
+/* ─── Section wrapper with scroll animation ─── */
+function FadeSection({ children, delay = 0, style = {} }) {
+  const [ref, visible] = useInView(0.1);
+  return (
+    <div
+      ref={ref}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(30px)",
+        transition: `opacity 0.7s ease ${delay}s, transform 0.7s ease ${delay}s`,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 /* ─── Data ─── */
 const phaseSteps = [
@@ -109,376 +176,600 @@ const phaseSteps = [
     id: "research",
     icon: icons.search,
     label: "Research",
-    color: "#FF6B35",
+    desc: "Gather intelligence on competitors, markets, and creative landscape",
+    color: "#E8553D",
+    lightBg: "#FEF2F0",
     children: [
-      { label: "Competitor Research", icon: icons.trophy },
-      { label: "Market Research", icon: icons.barChart },
-      { label: "Ad Copy Breakdowns", icon: icons.fileText },
-      { label: "Creative Breakdowns", icon: icons.palette },
-      { label: "Data Analysis", icon: icons.folder },
+      { label: "Competitor Research", icon: icons.trophy, desc: "Analyze top-performing competitor ads" },
+      { label: "Market Research", icon: icons.barChart, desc: "Identify trends and audience behavior" },
+      { label: "Ad Copy Breakdowns", icon: icons.fileText, desc: "Deconstruct winning ad copy patterns" },
+      { label: "Creative Breakdowns", icon: icons.palette, desc: "Study visual and format trends" },
+      { label: "Data Analysis", icon: icons.folder, desc: "Mine historical performance data" },
     ],
   },
   {
     id: "hypotheses",
     icon: icons.lightbulb,
     label: "Hypotheses",
-    color: "#FFD700",
+    desc: "Form testable predictions based on research insights",
+    color: "#D4A017",
+    lightBg: "#FDF8E8",
     children: [
-      { label: "What to Test", icon: icons.helpCircle },
-      { label: "Why It Matters", icon: icons.target },
-      { label: "Expected Outcome", icon: icons.pin },
+      { label: "What to Test", icon: icons.helpCircle, desc: "Define specific variables to test" },
+      { label: "Why It Matters", icon: icons.target, desc: "Tie hypotheses to business goals" },
+      { label: "Expected Outcome", icon: icons.pin, desc: "Predict results and set benchmarks" },
     ],
   },
   {
     id: "writing",
     icon: icons.pen,
     label: "Writing",
-    color: "#4ECDC4",
+    desc: "Craft compelling copy and creative direction documents",
+    color: "#2BA89E",
+    lightBg: "#EDF9F8",
     children: [
-      { label: "Hooks & Angles", icon: icons.anchor },
-      { label: "Scripts", icon: icons.file },
-      { label: "Creative Briefs", icon: icons.clipboard },
-      { label: "CTAs", icon: icons.mousePointer },
+      { label: "Hooks & Angles", icon: icons.anchor, desc: "Attention-grabbing openers" },
+      { label: "Scripts", icon: icons.file, desc: "Video and audio scripts" },
+      { label: "Creative Briefs", icon: icons.clipboard, desc: "Direction for designers and editors" },
+      { label: "CTAs", icon: icons.mousePointer, desc: "Conversion-driving calls to action" },
     ],
   },
   {
     id: "testing",
     icon: icons.flask,
     label: "Testing",
-    color: "#A78BFA",
+    desc: "Execute structured experiments across channels and audiences",
+    color: "#8B6FD6",
+    lightBg: "#F3F0FD",
     children: [
-      { label: "A/B Tests", icon: icons.scale },
-      { label: "Audience Splits", icon: icons.users },
-      { label: "Creative Variables", icon: icons.shuffle },
-      { label: "Channel Strategy", icon: icons.megaphone },
+      { label: "A/B Tests", icon: icons.scale, desc: "Head-to-head creative comparisons" },
+      { label: "Audience Splits", icon: icons.users, desc: "Segment targeting experiments" },
+      { label: "Creative Variables", icon: icons.shuffle, desc: "Isolate format, copy, and visual variables" },
+      { label: "Channel Strategy", icon: icons.megaphone, desc: "Platform-specific test plans" },
     ],
   },
   {
     id: "results",
     icon: icons.trendingUp,
     label: "Results",
-    color: "#34D399",
+    desc: "Measure outcomes and extract actionable insights",
+    color: "#1FA87A",
+    lightBg: "#EDFAF4",
     children: [
-      { label: "Performance Metrics", icon: icons.barChart },
-      { label: "Winning Creatives", icon: icons.award },
-      { label: "Key Learnings", icon: icons.brain },
-      { label: "Audience Insights", icon: icons.eye },
+      { label: "Performance Metrics", icon: icons.barChart, desc: "CTR, ROAS, CPA, and more" },
+      { label: "Winning Creatives", icon: icons.award, desc: "Identify top performers" },
+      { label: "Key Learnings", icon: icons.brain, desc: "Document what worked and why" },
+      { label: "Audience Insights", icon: icons.eye, desc: "Understand segment behavior" },
     ],
   },
   {
     id: "optimization",
     icon: icons.refresh,
     label: "Optimization",
-    color: "#F472B6",
+    desc: "Scale winners, cut losers, and restart the cycle",
+    color: "#D64D8A",
+    lightBg: "#FDF0F5",
     children: [
-      { label: "Scale Winners", icon: icons.rocket },
-      { label: "Kill Losers", icon: icons.x },
-      { label: "Feed Back to Research", icon: icons.cornerDownLeft },
-      { label: "Iterate & Improve", icon: icons.zap },
+      { label: "Scale Winners", icon: icons.rocket, desc: "Increase budget on proven creatives" },
+      { label: "Kill Losers", icon: icons.x, desc: "Quickly cut underperformers" },
+      { label: "Feed Back to Research", icon: icons.cornerDownLeft, desc: "Insights inform next research phase" },
+      { label: "Iterate & Improve", icon: icons.zap, desc: "Continuous creative refinement" },
     ],
   },
 ];
 
 const introCards = [
-  { label: "What's the Hype?", icon: icons.flame, desc: "The creative opportunity" },
-  { label: "Why Creative Strategy?", icon: icons.target, desc: "The competitive edge" },
-  { label: "Who Is It For?", icon: icons.user, desc: "ICP & audience profiling" },
+  {
+    label: "The Opportunity",
+    icon: icons.flame,
+    desc: "Creative is the #1 lever for paid media performance. The best brands treat it as a system, not a guess.",
+    color: "#E8553D",
+    bg: "#FEF2F0",
+  },
+  {
+    label: "The Edge",
+    icon: icons.target,
+    desc: "A structured creative strategy compounds over time. Every test adds to your knowledge base and sharpens your instinct.",
+    color: "#2BA89E",
+    bg: "#EDF9F8",
+  },
+  {
+    label: "The Audience",
+    icon: icons.user,
+    desc: "For growth marketers, creative strategists, and performance teams who want a repeatable process for winning ads.",
+    color: "#8B6FD6",
+    bg: "#F3F0FD",
+  },
+];
+
+const stats = [
+  { value: 56, suffix: "%", label: "of ad performance is driven by creative" },
+  { value: 3, suffix: "x", label: "ROAS lift from structured testing" },
+  { value: 80, suffix: "%", label: "of top brands use creative frameworks" },
 ];
 
 /* ─── Component ─── */
 export default function CreativeStrategyFlow() {
   const [active, setActive] = useState(null);
+  const [hoveredStep, setHoveredStep] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setLoaded(true), 100);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <div
       style={{
         fontFamily: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif",
-        background: "#0c0c0c",
+        background: "#fafafa",
         minHeight: "100vh",
-        padding: "48px 24px",
-        color: "white",
+        color: "#1a1a2e",
       }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(8px); }
+
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(24px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes expandIn {
-          from { opacity: 0; max-height: 0; }
-          to { opacity: 1; max-height: 500px; }
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateX(-12px); }
+          to { opacity: 1; transform: translateX(0); }
         }
-        .card { animation: fadeIn 0.3s ease forwards; }
-        .step-card { transition: all 0.2s ease; }
-        .step-card:hover { transform: translateY(-3px); }
-        .child-list { animation: expandIn 0.3s ease forwards; overflow: hidden; }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        @keyframes drawLine {
+          from { height: 0; }
+          to { height: 100%; }
+        }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.92); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+
+        .step-card {
+          transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .step-card:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+        }
+        .child-item {
+          animation: slideIn 0.35s ease forwards;
+          opacity: 0;
+          transition: background 0.2s ease, transform 0.2s ease;
+        }
+        .child-item:hover {
+          transform: translateX(4px);
+        }
+        .intro-card {
+          transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .intro-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 8px 30px rgba(0,0,0,0.06);
+        }
+        .stat-card {
+          transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+          transform: scale(1.03);
+        }
       `}</style>
 
-      {/* ─── Title ─── */}
-      <div style={{ textAlign: "center", marginBottom: 48 }}>
-        <div
-          style={{
-            fontSize: 11,
-            letterSpacing: "0.4em",
-            color: "#555",
-            marginBottom: 10,
-            textTransform: "uppercase",
-            fontWeight: 600,
-          }}
-        >
-          Framework
-        </div>
-        <h1
-          style={{
-            fontSize: 48,
-            fontWeight: 900,
-            letterSpacing: "-1.5px",
-            lineHeight: 1.1,
-            background: "linear-gradient(135deg, #fff 40%, #666)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            margin: 0,
-          }}
-        >
-          Creative Strategy
-        </h1>
-        <p style={{ fontSize: 14, color: "#444", marginTop: 10, fontWeight: 400 }}>
-          Click any phase to explore its components
-        </p>
-      </div>
-
-      {/* ─── Intro Cards ─── */}
+      {/* ─── Hero ─── */}
       <div
         style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: 16,
-          marginBottom: 40,
-          flexWrap: "wrap",
+          background: "linear-gradient(135deg, #fff 0%, #f0f4ff 50%, #faf0ff 100%)",
+          padding: "72px 24px 56px",
+          textAlign: "center",
+          position: "relative",
+          overflow: "hidden",
         }}
       >
-        {introCards.map((c) => (
+        {/* Decorative grid dots */}
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.3,
+          backgroundImage: "radial-gradient(circle, #c0c0c0 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+        }} />
+
+        <div style={{ position: "relative", zIndex: 1 }}>
           <div
-            key={c.label}
             style={{
-              background: "#141414",
-              border: "1px solid #222",
-              borderRadius: 10,
-              padding: "18px 24px",
-              minWidth: 180,
-              textAlign: "center",
-              transition: "border-color 0.2s ease",
+              display: "inline-block",
+              fontSize: 11,
+              letterSpacing: "0.35em",
+              color: "#8B6FD6",
+              textTransform: "uppercase",
+              fontWeight: 700,
+              marginBottom: 16,
+              padding: "6px 16px",
+              background: "#F3F0FD",
+              borderRadius: 20,
+              opacity: loaded ? 1 : 0,
+              transform: loaded ? "translateY(0)" : "translateY(12px)",
+              transition: "all 0.6s ease 0.1s",
             }}
           >
-            <div style={{ fontSize: 24, marginBottom: 6, color: "#888", display: "flex", justifyContent: "center" }}>
-              {c.icon}
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#ddd", letterSpacing: "0.01em" }}>
-              {c.label}
-            </div>
-            <div style={{ fontSize: 11, color: "#555", marginTop: 4, fontWeight: 400 }}>
-              {c.desc}
-            </div>
+            Framework
           </div>
-        ))}
+          <h1
+            style={{
+              fontSize: "clamp(36px, 5vw, 56px)",
+              fontWeight: 900,
+              letterSpacing: "-2px",
+              lineHeight: 1.1,
+              background: "linear-gradient(135deg, #1a1a2e 0%, #8B6FD6 60%, #E8553D 100%)",
+              backgroundSize: "200% auto",
+              animation: loaded ? "shimmer 4s linear infinite" : "none",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              margin: "0 0 16px",
+              opacity: loaded ? 1 : 0,
+              transform: loaded ? "translateY(0)" : "translateY(20px)",
+              transition: "opacity 0.7s ease 0.2s, transform 0.7s ease 0.2s",
+            }}
+          >
+            Creative Strategy
+          </h1>
+          <p
+            style={{
+              fontSize: 17,
+              color: "#666",
+              maxWidth: 520,
+              margin: "0 auto",
+              lineHeight: 1.6,
+              fontWeight: 400,
+              opacity: loaded ? 1 : 0,
+              transform: loaded ? "translateY(0)" : "translateY(16px)",
+              transition: "all 0.7s ease 0.35s",
+            }}
+          >
+            A repeatable, data-driven process for producing high-performing creative at scale.
+            Click any phase below to explore.
+          </p>
+        </div>
       </div>
 
-      {/* ─── Connector ─── */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          marginBottom: 28,
-        }}
-      >
+      {/* ─── Stats Bar ─── */}
+      <FadeSection>
         <div
           style={{
-            width: 1,
-            height: 36,
-            background: "linear-gradient(to bottom, transparent, #444)",
-          }}
-        />
-        <div
-          style={{
-            fontSize: 10,
-            letterSpacing: "0.35em",
-            color: "#444",
-            textTransform: "uppercase",
-            margin: "10px 0",
-            fontWeight: 600,
+            display: "flex",
+            justifyContent: "center",
+            gap: 0,
+            maxWidth: 800,
+            margin: "-28px auto 0",
+            padding: "0 24px",
+            position: "relative",
+            zIndex: 2,
           }}
         >
-          The Process
-        </div>
-        <div
-          style={{
-            width: 1,
-            height: 36,
-            background: "linear-gradient(to bottom, #444, transparent)",
-          }}
-        />
-      </div>
-
-      {/* ─── Phase Steps ─── */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(168px, 1fr))",
-          gap: 14,
-          maxWidth: 1120,
-          margin: "0 auto",
-        }}
-      >
-        {phaseSteps.map((step, i) => {
-          const isActive = active === step.id;
-          return (
-            <div
-              key={step.id}
-              className="card"
-              style={{ animationDelay: `${i * 0.06}s`, opacity: 0 }}
-            >
-              {/* Step Card */}
+          <div
+            style={{
+              display: "flex",
+              background: "#fff",
+              borderRadius: 16,
+              boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
+              border: "1px solid #eee",
+              overflow: "hidden",
+              width: "100%",
+            }}
+          >
+            {stats.map((s, i) => (
               <div
-                className="step-card"
-                onClick={() => setActive(isActive ? null : step.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setActive(isActive ? null : step.id);
-                  }
-                }}
+                key={i}
+                className="stat-card"
                 style={{
-                  background: isActive ? "#181818" : "#111",
-                  border: `1px solid ${isActive ? step.color + "66" : "#1c1c1c"}`,
-                  borderTop: `3px solid ${step.color}`,
-                  borderRadius: 10,
-                  padding: "20px 14px 16px",
+                  flex: 1,
+                  padding: "24px 20px",
                   textAlign: "center",
-                  cursor: "pointer",
-                  position: "relative",
-                  boxShadow: isActive
-                    ? `0 4px 24px ${step.color}18`
-                    : "0 1px 3px rgba(0,0,0,0.3)",
-                  outline: "none",
+                  borderRight: i < stats.length - 1 ? "1px solid #f0f0f0" : "none",
                 }}
               >
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 10,
-                    left: 12,
-                    fontSize: 10,
-                    color: "#333",
-                    fontWeight: 700,
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {String(i + 1).padStart(2, "0")}
+                <div style={{ fontSize: 32, fontWeight: 900, color: "#1a1a2e", letterSpacing: "-1px" }}>
+                  <AnimatedNumber value={s.value} suffix={s.suffix} />
                 </div>
-                <div
-                  style={{
-                    fontSize: 30,
-                    marginBottom: 10,
-                    color: isActive ? step.color : "#666",
-                    display: "flex",
-                    justifyContent: "center",
-                    transition: "color 0.2s ease",
-                  }}
-                >
-                  {step.icon}
-                </div>
-                <div
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: isActive ? step.color : "#bbb",
-                    letterSpacing: "0.02em",
-                    transition: "color 0.2s ease",
-                  }}
-                >
-                  {step.label}
-                </div>
-                <div
-                  style={{
-                    marginTop: 10,
-                    fontSize: 14,
-                    color: "#333",
-                    display: "flex",
-                    justifyContent: "center",
-                    transition: "transform 0.2s ease",
-                    transform: isActive ? "rotate(180deg)" : "rotate(0deg)",
-                  }}
-                >
-                  {icons.chevronDown}
+                <div style={{ fontSize: 12, color: "#888", marginTop: 4, fontWeight: 500 }}>
+                  {s.label}
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </FadeSection>
 
-              {/* Expanded Children */}
-              {isActive && (
+      {/* ─── Intro Cards ─── */}
+      <div style={{ padding: "56px 24px 0", maxWidth: 1000, margin: "0 auto" }}>
+        <FadeSection>
+          <div style={{ textAlign: "center", marginBottom: 32 }}>
+            <h2 style={{ fontSize: 28, fontWeight: 800, color: "#1a1a2e", letterSpacing: "-0.5px", margin: "0 0 8px" }}>
+              Why This Matters
+            </h2>
+            <p style={{ fontSize: 14, color: "#888" }}>The foundation of every winning creative team</p>
+          </div>
+        </FadeSection>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20 }}>
+          {introCards.map((c, i) => (
+            <FadeSection key={c.label} delay={i * 0.1}>
+              <div
+                className="intro-card"
+                style={{
+                  background: "#fff",
+                  border: "1px solid #eee",
+                  borderRadius: 14,
+                  padding: "28px 24px",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                <div style={{
+                  position: "absolute", top: 0, left: 0, right: 0, height: 3,
+                  background: `linear-gradient(90deg, ${c.color}, ${c.color}88)`,
+                }} />
                 <div
-                  className="child-list"
                   style={{
-                    marginTop: 8,
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    background: c.bg,
                     display: "flex",
-                    flexDirection: "column",
-                    gap: 6,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 22,
+                    color: c.color,
+                    marginBottom: 16,
                   }}
                 >
-                  {step.children.map((child, ci) => (
+                  {c.icon}
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", marginBottom: 8 }}>
+                  {c.label}
+                </div>
+                <div style={{ fontSize: 13, color: "#777", lineHeight: 1.6 }}>
+                  {c.desc}
+                </div>
+              </div>
+            </FadeSection>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Process Connector ─── */}
+      <FadeSection style={{ padding: "48px 24px 0" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <div style={{ width: 1, height: 48, background: "linear-gradient(to bottom, transparent, #ccc)" }} />
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: "0.4em",
+              color: "#999",
+              textTransform: "uppercase",
+              margin: "12px 0",
+              fontWeight: 700,
+              padding: "6px 20px",
+              background: "#fff",
+              borderRadius: 20,
+              border: "1px solid #eee",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+            }}
+          >
+            The Process
+          </div>
+          <div style={{ width: 1, height: 48, background: "linear-gradient(to bottom, #ccc, transparent)" }} />
+        </div>
+      </FadeSection>
+
+      {/* ─── Phase Steps ─── */}
+      <div style={{ padding: "16px 24px 0", maxWidth: 1160, margin: "0 auto" }}>
+        {/* Horizontal flow indicator */}
+        <FadeSection>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 28 }}>
+            {phaseSteps.map((step, i) => (
+              <div key={step.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div
+                  style={{
+                    width: 10, height: 10, borderRadius: "50%",
+                    background: active === step.id ? step.color : "#ddd",
+                    transition: "all 0.4s ease",
+                    boxShadow: active === step.id ? `0 0 12px ${step.color}44` : "none",
+                  }}
+                />
+                {i < phaseSteps.length - 1 && (
+                  <div style={{ width: 32, height: 2, background: "#e8e8e8", borderRadius: 1 }} />
+                )}
+              </div>
+            ))}
+          </div>
+        </FadeSection>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(168px, 1fr))",
+            gap: 16,
+          }}
+        >
+          {phaseSteps.map((step, i) => {
+            const isActive = active === step.id;
+            const isHovered = hoveredStep === step.id;
+            return (
+              <FadeSection key={step.id} delay={i * 0.08}>
+                <div>
+                  {/* Step Card */}
+                  <div
+                    className="step-card"
+                    onClick={() => setActive(isActive ? null : step.id)}
+                    onMouseEnter={() => setHoveredStep(step.id)}
+                    onMouseLeave={() => setHoveredStep(null)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setActive(isActive ? null : step.id);
+                      }
+                    }}
+                    style={{
+                      background: isActive ? step.lightBg : "#fff",
+                      border: `1px solid ${isActive ? step.color + "44" : isHovered ? step.color + "33" : "#e8e8e8"}`,
+                      borderRadius: 14,
+                      padding: "24px 16px 18px",
+                      textAlign: "center",
+                      cursor: "pointer",
+                      position: "relative",
+                      boxShadow: isActive
+                        ? `0 8px 32px ${step.color}14`
+                        : "0 2px 8px rgba(0,0,0,0.03)",
+                      outline: "none",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {/* Colored top bar */}
+                    <div style={{
+                      position: "absolute", top: 0, left: 0, right: 0, height: 3,
+                      background: step.color,
+                      opacity: isActive || isHovered ? 1 : 0.4,
+                      transition: "opacity 0.3s ease",
+                    }} />
+
                     <div
-                      key={child.label}
-                      className="card"
                       style={{
-                        background: "#131313",
-                        border: "1px solid #1c1c1c",
-                        borderLeft: `3px solid ${step.color}`,
-                        borderRadius: 8,
-                        padding: "10px 12px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        animationDelay: `${ci * 0.04}s`,
-                        opacity: 0,
+                        position: "absolute", top: 12, left: 14,
+                        fontSize: 10, color: "#bbb", fontWeight: 700,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
-                      <span style={{ fontSize: 15, color: step.color, display: "flex", flexShrink: 0 }}>
-                        {child.icon}
-                      </span>
-                      <span style={{ fontSize: 12, color: "#999", fontWeight: 500 }}>
-                        {child.label}
-                      </span>
+                      {String(i + 1).padStart(2, "0")}
                     </div>
-                  ))}
+
+                    <div
+                      style={{
+                        width: 48, height: 48, borderRadius: 14,
+                        background: isActive ? `${step.color}18` : "#f5f5f7",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        margin: "0 auto 12px", fontSize: 24,
+                        color: isActive ? step.color : "#888",
+                        transition: "all 0.3s ease",
+                      }}
+                    >
+                      {step.icon}
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: 15, fontWeight: 700,
+                        color: isActive ? step.color : "#333",
+                        transition: "color 0.3s ease",
+                        marginBottom: 6,
+                      }}
+                    >
+                      {step.label}
+                    </div>
+
+                    <div style={{ fontSize: 11, color: "#999", lineHeight: 1.5, minHeight: 32 }}>
+                      {step.desc}
+                    </div>
+
+                    <div
+                      style={{
+                        marginTop: 12, fontSize: 13, color: "#bbb",
+                        display: "flex", justifyContent: "center",
+                        transition: "transform 0.3s ease, color 0.3s ease",
+                        transform: isActive ? "rotate(180deg)" : "rotate(0deg)",
+                      }}
+                    >
+                      {icons.chevronDown}
+                    </div>
+                  </div>
+
+                  {/* Expanded Children */}
+                  {isActive && (
+                    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                      {step.children.map((child, ci) => (
+                        <div
+                          key={child.label}
+                          className="child-item"
+                          style={{
+                            background: "#fff",
+                            border: "1px solid #eee",
+                            borderLeft: `3px solid ${step.color}`,
+                            borderRadius: 10,
+                            padding: "12px 14px",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 12,
+                            animationDelay: `${ci * 0.06}s`,
+                            cursor: "default",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 16, color: step.color, display: "flex", flexShrink: 0,
+                              marginTop: 1,
+                              width: 32, height: 32, borderRadius: 8,
+                              background: step.lightBg,
+                              alignItems: "center", justifyContent: "center",
+                            }}
+                          >
+                            {child.icon}
+                          </span>
+                          <div>
+                            <span style={{ fontSize: 13, color: "#333", fontWeight: 600, display: "block" }}>
+                              {child.label}
+                            </span>
+                            <span style={{ fontSize: 11, color: "#999", marginTop: 2, display: "block", lineHeight: 1.4 }}>
+                              {child.desc}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
+              </FadeSection>
+            );
+          })}
+        </div>
       </div>
 
       {/* ─── Loop Indicator ─── */}
-      <div style={{ textAlign: "center", marginTop: 40 }}>
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 10,
-            border: "1px solid #1c1c1c",
-            borderRadius: 24,
-            padding: "8px 20px",
-            background: "#111",
-          }}
-        >
-          <span style={{ fontSize: 16, color: "#555", display: "flex" }}>{icons.refresh}</span>
-          <span style={{ color: "#444", fontSize: 12, fontWeight: 500 }}>
-            Optimization feeds back into Research — the loop never stops
-          </span>
+      <FadeSection style={{ padding: "48px 24px 20px" }}>
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 12,
+              border: "1px solid #e0e0e0", borderRadius: 28,
+              padding: "12px 28px", background: "#fff",
+              boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+            }}
+          >
+            <span style={{ fontSize: 18, color: "#8B6FD6", display: "flex", animation: "pulse 2s ease-in-out infinite" }}>
+              {icons.refresh}
+            </span>
+            <span style={{ color: "#666", fontSize: 13, fontWeight: 500 }}>
+              Optimization feeds back into Research — the loop never stops
+            </span>
+          </div>
         </div>
+      </FadeSection>
+
+      {/* ─── Footer ─── */}
+      <div style={{ textAlign: "center", padding: "24px 24px 48px" }}>
+        <p style={{ fontSize: 11, color: "#bbb" }}>
+          Creative Strategy Framework
+        </p>
       </div>
     </div>
   );
